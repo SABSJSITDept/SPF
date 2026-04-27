@@ -6,8 +6,13 @@ use App\Http\Controllers\SpfRegistrationController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\MemberCountController;
 
 Route::post('/register', [SpfRegistrationController::class, 'store']);
+
+// Open API – Anchal-wise, Local-Sangh-wise member count (no auth required)
+// GET /api/member-count?status=approved   (status: approved|pending|rejected|all)
+Route::get('/member-count', [MemberCountController::class, 'memberCountByAnchalAndSangh']);
 
 Route::get('/categories', [CategoryController::class, 'index']);
 Route::get('/sub-categories/{category_id}', [CategoryController::class, 'getSubCategories']);
