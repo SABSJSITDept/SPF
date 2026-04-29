@@ -369,6 +369,7 @@
             </div>
         </div>
 
+        @if(Auth::guard('admin')->user()->isSuperAdmin())
         <div style="margin-bottom: 12px; display: flex; gap: 8px;">
             <form method="POST" action="{{ route('admin.members.approveAll') }}" id="approveAllForm" style="display:inline;">
                 @csrf
@@ -396,6 +397,7 @@
                 </button>
             </form>
         </div>
+        @endif
 
         <div class="table-wrapper">
             @if($registrations->isEmpty())
@@ -479,6 +481,7 @@
                         <td class="col-status"><span class="status-badge">Pending</span></td>
                         <td class="col-regat">{{ $reg->created_at->format('d-m-Y H:i') }}</td>
                         <td>
+                            @if(Auth::guard('admin')->user()->isSuperAdmin())
                             <form method="POST" action="{{ route('admin.members.updateStatus', $reg->id) }}" style="display:inline;">
                                 @csrf
                                 <input type="hidden" name="status" value="approved">
@@ -495,6 +498,7 @@
                                     Reject
                                 </button>
                             </form>
+                            @endif
                             @if(Auth::guard('admin')->user() && !Auth::guard('admin')->user()->isAnchalOperator())
                             <a href="{{ route('admin.members.edit', $reg->id) }}"
                                 style="background:#1565c0;color:#fff;border:none;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-block;margin-left:4px;">

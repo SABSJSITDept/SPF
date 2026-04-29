@@ -377,8 +377,8 @@ class SpfRegistrationController extends Controller
         $request->validate(['status' => 'required|in:pending,approved,rejected']);
         $registration = SpfRegistration::findOrFail($id);
 
-        if ($admin && $admin->isAnchalOperator() && $registration->anchal != $admin->anchal) {
-            abort(403, 'Unauthorized action.');
+        if ($admin && !$admin->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can change status.');
         }
 
         $registration->update(['status' => $request->status]);
@@ -415,10 +415,10 @@ class SpfRegistrationController extends Controller
         }
 
         $admin = Auth::guard('admin')->user();
-        $query = SpfRegistration::whereIn('id', $ids);
-        if ($admin && $admin->isAnchalOperator()) {
-            $query->where('anchal', $admin->anchal);
+        if ($admin && !$admin->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can change status.');
         }
+        $query = SpfRegistration::whereIn('id', $ids);
         $registrations = $query->get();
 
         foreach ($registrations as $registration) {
@@ -448,8 +448,8 @@ class SpfRegistrationController extends Controller
         $admin = Auth::guard('admin')->user();
         $query = SpfRegistration::where('status', 'pending');
 
-        if ($admin && $admin->isAnchalOperator()) {
-            $query->where('anchal', $admin->anchal);
+        if ($admin && !$admin->isSuperAdmin()) {
+            abort(403, 'Only Super Admin can change status.');
         }
 
         $registrations = $query->get();
