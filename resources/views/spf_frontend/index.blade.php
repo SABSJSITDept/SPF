@@ -636,7 +636,9 @@
                     this.focus();
                     var self = this;
                     function onOutside(ev) {
-                        if (ev.target !== self) {
+                        // Keep dropdown open when clicking one of its options;
+                        // close only when click is outside the select.
+                        if (!self.contains(ev.target)) {
                             self.size = 1;
                             document.removeEventListener('mousedown', onOutside, true);
                         }
@@ -648,6 +650,7 @@
             });
 
             sel.addEventListener('change', function () { this.size = 1; });
+            sel.addEventListener('blur', function () { this.size = 1; });
             sel.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape') { this.size = 1; this.blur(); }
             });
