@@ -468,23 +468,45 @@ class SpfRegistrationController extends Controller
     {
         $request->validate([
             'status' => 'required|in:pending,approved,rejected',
-            'ids' => 'required|string'
+            'ids' => 'nullable|string',
+            'bulk_scope' => 'nullable|in:selected,filtered_pending',
+            'filters_json' => 'nullable|string',
         ]);
-
-        $ids = explode(',', $request->ids);
-        if (empty($ids)) {
-            return back()->with('error', 'No members selected.');
-        }
 
         $admin = Auth::guard('admin')->user();
         if ($admin && !$admin->isSuperAdmin()) {
             abort(403, 'Only Super Admin can change status.');
         }
-        $query = SpfRegistration::whereIn('id', $ids);
-        $registrations = $query->get(['id', 'mid']);
+
+        $scope = $request->input('bulk_scope', 'selected');
+
+        if ($scope === 'filtered_pending') {
+            $filters = json_decode($request->input('filters_json', '{}'), true);
+            if (!is_array($filters)) {
+                $filters = [];
+            }
+
+            $query = SpfRegistration::where('status', 'pending');
+            $filterRequest = Request::create('', 'GET', $filters);
+            $this->applyMemberFilters($query, $filterRequest);
+            $registrations = $query->get(['id', 'mid']);
+        } else {
+            $ids = collect(explode(',', (string) $request->ids))
+                ->map(fn ($id) => trim($id))
+                ->filter()
+                ->values()
+                ->all();
+
+            if (empty($ids)) {
+                return back()->with('error', 'No members selected.');
+            }
+
+            $query = SpfRegistration::whereIn('id', $ids);
+            $registrations = $query->get(['id', 'mid']);
+        }
 
         if ($registrations->isEmpty()) {
-            return back()->with('error', 'No valid members selected.');
+            return back()->with('error', 'No valid members found for bulk action.');
         }
 
         SpfRegistration::whereIn('id', $registrations->pluck('id'))->update(['status' => $request->status]);

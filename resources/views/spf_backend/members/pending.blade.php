@@ -382,6 +382,8 @@
                 @csrf
                 <input type="hidden" name="status" value="approved">
                 <input type="hidden" name="ids" id="bulkApproveIds">
+                <input type="hidden" name="bulk_scope" id="bulkApproveScope" value="selected">
+                <input type="hidden" name="filters_json" id="bulkApproveFilters" value='@json(request()->except(["page","export","export_fields"]))'>
                 <button type="button" onclick="submitBulkAction('approve')"
                     style="background:#2e7d32;color:#fff;border:none;padding:8px 16px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;">
                     &#10004; Approve Selected
@@ -391,11 +393,20 @@
                 @csrf
                 <input type="hidden" name="status" value="rejected">
                 <input type="hidden" name="ids" id="bulkRejectIds">
+                <input type="hidden" name="bulk_scope" id="bulkRejectScope" value="selected">
+                <input type="hidden" name="filters_json" id="bulkRejectFilters" value='@json(request()->except(["page","export","export_fields"]))'>
                 <button type="button" onclick="submitBulkAction('reject')"
                     style="background:#c62828;color:#fff;border:none;padding:8px 16px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;">
                     &#10006; Reject Selected
                 </button>
             </form>
+
+            @if($activeFilters)
+            <label style="display:inline-flex;align-items:center;gap:6px;padding:0 10px;border:1px solid #d1d5db;border-radius:4px;background:#fff;font-size:12px;color:#374151;cursor:pointer;">
+                <input type="checkbox" id="selectAllFilteredMode" style="cursor:pointer;">
+                <span>Select all filtered records ({{ $registrations->total() }})</span>
+            </label>
+            @endif
         </div>
         @endif
 
@@ -736,17 +747,19 @@
         }
 
         function submitBulkAction(action) {
+            const useFilteredMode = !!document.getElementById('selectAllFilteredMode')?.checked;
             const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
-            if (checkedBoxes.length === 0) {
+            if (!useFilteredMode && checkedBoxes.length === 0) {
                 showToast('Please select at least one member to ' + action + '.', 'warning');
                 return;
             }
 
             const ids = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+            const targetCount = useFilteredMode ? {{ $registrations->total() }} : checkedBoxes.length;
             
             Swal.fire({
                 title: 'Are you sure?',
-                text: 'Are you sure you want to ' + action + ' ' + checkedBoxes.length + ' selected members?',
+                text: 'Are you sure you want to ' + action + ' ' + targetCount + (useFilteredMode ? ' filtered members?' : ' selected members?'),
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: action === 'approve' ? '#2e7d32' : '#c62828',
@@ -757,9 +770,11 @@
                     showSpinner();
                     if (action === 'approve') {
                         document.getElementById('bulkApproveIds').value = ids;
+                        document.getElementById('bulkApproveScope').value = useFilteredMode ? 'filtered_pending' : 'selected';
                         document.getElementById('bulkApproveForm').submit();
                     } else if (action === 'reject') {
                         document.getElementById('bulkRejectIds').value = ids;
+                        document.getElementById('bulkRejectScope').value = useFilteredMode ? 'filtered_pending' : 'selected';
                         document.getElementById('bulkRejectForm').submit();
                     }
                 }
