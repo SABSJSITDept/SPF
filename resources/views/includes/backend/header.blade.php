@@ -214,6 +214,7 @@
             gap: 12px;
             flex-shrink: 0;
             margin-left: 12px;
+            position: relative;
         }
 
         .navbar-right .admin-info {
@@ -222,6 +223,44 @@
             display: flex;
             flex-direction: column;
             align-items: flex-end;
+        }
+
+        .account-trigger {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 8px;
+        }
+
+        .account-trigger:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
+        .account-trigger .menu-arrow {
+            color: rgba(255,255,255,0.85);
+            font-size: 10px;
+            margin-left: 2px;
+        }
+
+        .account-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            min-width: 170px;
+            overflow: hidden;
+            z-index: 10020;
+        }
+
+        .navbar-right.open .account-dropdown {
+            display: block;
         }
 
         .admin-avatar {
@@ -688,13 +727,6 @@
         </li>
         @endif
 
-        {{-- Reports — Super Admin & Operator --}}
-        @if(Auth::guard('admin')->user()?->canViewAll())
-        <li>
-            <a href="#">&#128202;&nbsp; Reports</a>
-        </li>
-        @endif
-
         {{-- Admin Management — Super Admin only --}}
         @if(Auth::guard('admin')->user()?->isSuperAdmin())
         <li>
@@ -715,26 +747,29 @@
             </span>
             <div class="dropdown-menu">
                 <a href="{{ route('admin.password.form') }}">&#128274;&nbsp; Change Password</a>
-                <a href="#">&#128100;&nbsp; Profile</a>
-                <div class="dropdown-divider"></div>
-                <form method="POST" action="{{ route('admin.logout') }}" style="margin:0;">
-                    @csrf
-                    <button type="submit" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; padding:10px 16px; color:#e53935; font-size:13px; background:none; border:none; cursor:pointer; font-family:inherit; min-height:44px;">
-                        &#10006;&nbsp; Logout
-                    </button>
-                </form>
             </div>
         </li>
 
     </ul>
 
     {{-- Right: Admin Info --}}
-    <div class="navbar-right">
-        <div class="admin-info" style="text-align:right; line-height:1.4;">
-            <div style="font-weight:600; color:#fff; font-size:13px;">{{ Auth::guard('admin')->user()?->name ?? 'Admin' }}</div>
-            <div style="font-size:11px; opacity:0.7;">{{ Auth::guard('admin')->user()?->getRoleLabel() ?? '' }}</div>
+    <div class="navbar-right" id="accountMenu">
+        <button class="account-trigger" id="accountTrigger" type="button">
+            <div class="admin-info" style="text-align:right; line-height:1.4;">
+                <div style="font-weight:600; color:#fff; font-size:13px;">{{ Auth::guard('admin')->user()?->name ?? 'Admin' }}</div>
+                <div style="font-size:11px; opacity:0.7;">{{ Auth::guard('admin')->user()?->getRoleLabel() ?? '' }}</div>
+            </div>
+            <div class="admin-avatar">{{ strtoupper(substr(Auth::guard('admin')->user()?->name ?? 'A', 0, 1)) }}</div>
+            <span class="menu-arrow">&#9660;</span>
+        </button>
+        <div class="account-dropdown" id="accountDropdown">
+            <form method="POST" action="{{ route('admin.logout') }}" style="margin:0;">
+                @csrf
+                <button type="submit" style="width:100%; text-align:left; display:flex; align-items:center; gap:10px; padding:11px 16px; color:#e53935; font-size:13px; background:none; border:none; cursor:pointer; font-family:inherit; min-height:44px;">
+                    &#10006;&nbsp; Logout
+                </button>
+            </form>
         </div>
-        <div class="admin-avatar">{{ strtoupper(substr(Auth::guard('admin')->user()?->name ?? 'A', 0, 1)) }}</div>
     </div>
 
 </nav>
@@ -749,6 +784,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const navbarMenu = document.getElementById('navbarMenu');
     const mobileOverlay = document.getElementById('mobileOverlay');
+    const accountMenu = document.getElementById('accountMenu');
+    const accountTrigger = document.getElementById('accountTrigger');
     
     if (!hamburgerBtn || !navbarMenu) return;
 
@@ -835,8 +872,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 const li = toggle.closest('li');
                 if (li) li.classList.remove('open');
             });
+            if (accountMenu) {
+                accountMenu.classList.remove('open');
+            }
         }
     });
+
+    if (accountTrigger && accountMenu) {
+        accountTrigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            accountMenu.classList.toggle('open');
+        });
+    }
 
     // Handle window resize — clean up mobile state when going to desktop
     let resizeTimer;
@@ -853,6 +901,12 @@ document.addEventListener('DOMContentLoaded', function() {
     navbarMenu.addEventListener('click', function(e) {
         e.stopPropagation();
     });
+
+    if (accountMenu) {
+        accountMenu.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    }
 
     // Handle ESC key to close mobile menu
     document.addEventListener('keydown', function(e) {

@@ -103,6 +103,7 @@
         gap: 14px;
         transition: transform 0.2s, box-shadow 0.2s;
         border-top: 4px solid;
+        text-decoration: none;
     }
 
     .anchal-card:hover {
@@ -171,34 +172,34 @@
 
 {{-- ── SUMMARY CARDS ─────────────────────────────────────── --}}
 <div class="summary-grid">
-    <div class="summary-card total">
+    <a href="{{ route('admin.registrations') }}" class="summary-card total" style="text-decoration: none;">
         <div class="summary-icon">&#128101;</div>
         <div class="summary-info">
             <div class="count">{{ $totalMembers }}</div>
             <div class="label">Total Members</div>
         </div>
-    </div>
-    <div class="summary-card approved">
+    </a>
+    <a href="{{ route('admin.members.approved') }}" class="summary-card approved" style="text-decoration: none;">
         <div class="summary-icon">&#10003;</div>
         <div class="summary-info">
             <div class="count">{{ $approvedCount }}</div>
             <div class="label">Approved</div>
         </div>
-    </div>
-    <div class="summary-card pending">
+    </a>
+    <a href="{{ route('admin.members.pending') }}" class="summary-card pending" style="text-decoration: none;">
         <div class="summary-icon">&#8987;</div>
         <div class="summary-info">
             <div class="count">{{ $pendingCount }}</div>
             <div class="label">Pending</div>
         </div>
-    </div>
-    <div class="summary-card rejected">
+    </a>
+    <a href="{{ route('admin.members.rejected') }}" class="summary-card rejected" style="text-decoration: none;">
         <div class="summary-icon">&#10007;</div>
         <div class="summary-info">
             <div class="count">{{ $rejectedCount }}</div>
             <div class="label">Rejected</div>
         </div>
-    </div>
+    </a>
 </div>
 
 {{-- ── ANCHAL-WISE CARDS ─────────────────────────────────── --}}
@@ -209,14 +210,14 @@
 @else
 <div class="anchal-grid">
     @foreach($anchalStats as $stat)
-    <div class="anchal-card">
+    <a class="anchal-card" href="{{ route('admin.members.approved', ['anchal' => $stat->anchal]) }}" title="View {{ $stat->anchal_label }} approved members">
         <div class="anchal-icon">&#127759;</div>
         <div class="anchal-info">
             <div class="anchal-name" title="{{ $stat->anchal_label }}">{{ $stat->anchal_label }}</div>
             <div class="anchal-count">{{ $stat->total }}</div>
             <div class="anchal-sub">Members</div>
         </div>
-    </div>
+    </a>
     @endforeach
 </div>
 @endif

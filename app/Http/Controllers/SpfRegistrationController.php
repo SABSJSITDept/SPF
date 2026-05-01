@@ -106,6 +106,7 @@ class SpfRegistrationController extends Controller
         $rejectedCount = (clone $query)->where('status', 'rejected')->count();
 
         $anchalStats = (clone $query)
+            ->where('status', 'approved')
             ->select('anchal', DB::raw('count(*) as total'))
             ->groupBy('anchal')
             ->orderByRaw('CAST(anchal AS UNSIGNED) ASC')
@@ -140,21 +141,46 @@ class SpfRegistrationController extends Controller
         ));
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $admin = Auth::guard('admin')->user();
+        $selectedAnchal = trim((string) $request->query('anchal', ''));
 
         // Anchal Operator: only approved records from their assigned anchal
         if ($admin && $admin->isAnchalOperator()) {
-            $registrations = SpfRegistration::where('anchal', $admin->anchal)
-                ->where('status', 'approved')
-                ->latest()->get();
+            $query = SpfRegistration::where('anchal', $admin->anchal)
+                ->where('status', 'approved');
         } else {
             // Super Admin & Operator: all records
-            $registrations = SpfRegistration::latest()->get();
+            $query = SpfRegistration::query();
         }
 
-        return view('spf_backend.index', compact('registrations'));
+        if ($selectedAnchal !== '') {
+            $query->where('anchal', $selectedAnchal);
+        }
+
+        $this->applyMemberFilters($query, $request);
+
+        $lookups  = $this->getCityLookups();
+        $cityMap   = $lookups['cityMap']   ?? [];
+        $stateMap  = $lookups['stateMap']  ?? [];
+        $anchalMap = $lookups['anchalMap'] ?? [];
+        $citiesRaw = $lookups['cities']    ?? [];
+        $branches      = $this->getBranches();
+        $categoryNameMap = $this->getCategoryMap();
+
+        if ($exportResponse = $this->exportData(clone $query, $request, $cityMap, $stateMap, $anchalMap, $categoryNameMap, $branches)) {
+            return $exportResponse;
+        }
+
+        $registrations = $query->latest()->paginate(25)->appends($request->query());
+        $categories    = Category::where('status', 'Active')->orderBy('category_name')->get();
+        $subCategories = SubCategory::where('status', 'Active')->orderBy('sub_category_name')->get();
+
+        return view('spf_backend.index', compact(
+            'registrations', 'selectedAnchal', 'cityMap', 'stateMap', 'anchalMap', 
+            'categories', 'subCategories', 'citiesRaw', 'branches', 'categoryNameMap'
+        ));
     }
 
     public function store(Request $request)

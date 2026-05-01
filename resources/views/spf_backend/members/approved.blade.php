@@ -13,7 +13,12 @@
         .no-records { text-align: center; padding: 40px; color: #888; font-size: 15px; }
         .file-link { color: #1565c0; text-decoration: none; }
         .file-link:hover { text-decoration: underline; }
-        .col-profcat { white-space: normal; min-width: 160px; max-width: 220px; word-break: break-word; }
+        .col-profession, .col-profcat, .col-fullname, .col-fathername, .col-objectives, .col-hobbies, .col-referral { 
+            white-space: normal !important; 
+            min-width: 150px; 
+            max-width: 280px; 
+            word-break: break-word; 
+        }
         .status-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; background:#e8f5e9; color:#2e7d32; }
         .breadcrumb { font-size: 13px; color: #888; margin-bottom: 16px; }
         .breadcrumb a { color: #1a237e; text-decoration: none; }
@@ -354,15 +359,15 @@
                     <label class="modal-row is-checked" id="cv-col-profcat"><span>11: Prof. Category</span><input type="checkbox" class="col-toggle" data-col="col-profcat" checked></label>
                     <label class="modal-row is-checked" id="cv-col-state"><span>12: State</span><input type="checkbox" class="col-toggle" data-col="col-state" checked></label>
                     <label class="modal-row is-checked" id="cv-col-city"><span>13: City</span><input type="checkbox" class="col-toggle" data-col="col-city" checked></label>
-                    <label class="modal-row" id="cv-col-anchal"><span>14: Anchal</span><input type="checkbox" class="col-toggle" data-col="col-anchal"></label>
-                    <label class="modal-row" id="cv-col-sadhumargi"><span>15: Sadhumargi</span><input type="checkbox" class="col-toggle" data-col="col-sadhumargi"></label>
-                    <label class="modal-row" id="cv-col-hobbies"><span>16: Hobbies</span><input type="checkbox" class="col-toggle" data-col="col-hobbies"></label>
-                    <label class="modal-row" id="cv-col-referral"><span>17: Referral</span><input type="checkbox" class="col-toggle" data-col="col-referral"></label>
-                    <label class="modal-row" id="cv-col-objectives"><span>18: Objectives</span><input type="checkbox" class="col-toggle" data-col="col-objectives"></label>
-                    <label class="modal-row" id="cv-col-source"><span>19: Source</span><input type="checkbox" class="col-toggle" data-col="col-source"></label>
-                    <label class="modal-row" id="cv-col-workstatus"><span>20: Working Status</span><input type="checkbox" class="col-toggle" data-col="col-workstatus"></label>
-                    <label class="modal-row" id="cv-col-doctype"><span>21: Document Type</span><input type="checkbox" class="col-toggle" data-col="col-doctype"></label>
-                    <label class="modal-row is-checked" id="cv-col-file"><span>22: File</span><input type="checkbox" class="col-toggle" data-col="col-file" checked></label>
+                    <label class="modal-row is-checked" id="cv-col-file"><span>14: Document</span><input type="checkbox" class="col-toggle" data-col="col-file" checked></label>
+                    <label class="modal-row" id="cv-col-doctype"><span>15: Document Type</span><input type="checkbox" class="col-toggle" data-col="col-doctype"></label>
+                    <label class="modal-row" id="cv-col-anchal"><span>16: Anchal</span><input type="checkbox" class="col-toggle" data-col="col-anchal"></label>
+                    <label class="modal-row" id="cv-col-sadhumargi"><span>17: Sadhumargi</span><input type="checkbox" class="col-toggle" data-col="col-sadhumargi"></label>
+                    <label class="modal-row" id="cv-col-hobbies"><span>18: Hobbies</span><input type="checkbox" class="col-toggle" data-col="col-hobbies"></label>
+                    <label class="modal-row" id="cv-col-referral"><span>19: Referral</span><input type="checkbox" class="col-toggle" data-col="col-referral"></label>
+                    <label class="modal-row" id="cv-col-objectives"><span>20: Objectives</span><input type="checkbox" class="col-toggle" data-col="col-objectives"></label>
+                    <label class="modal-row" id="cv-col-source"><span>21: Source</span><input type="checkbox" class="col-toggle" data-col="col-source"></label>
+                    <label class="modal-row" id="cv-col-workstatus"><span>22: Working Status</span><input type="checkbox" class="col-toggle" data-col="col-workstatus"></label>
                     <label class="modal-row" id="cv-col-status"><span>23: Status</span><input type="checkbox" class="col-toggle" data-col="col-status"></label>
                     <label class="modal-row" id="cv-col-regat"><span>24: Reg. At</span><input type="checkbox" class="col-toggle" data-col="col-regat"></label>
                 </div>
@@ -390,6 +395,8 @@
                         <th class="col-profcat">Prof. Category</th>
                         <th class="col-state">State</th>
                         <th class="col-city">City</th>
+                        <th class="col-file">Document</th>
+                        <th class="col-doctype">Document Type</th>
                         <th class="col-anchal">Anchal</th>
                         <th class="col-sadhumargi">Sadhumargi</th>
                         <th class="col-hobbies">Hobbies</th>
@@ -397,8 +404,6 @@
                         <th class="col-objectives">Objectives</th>
                         <th class="col-source">Source</th>
                         <th class="col-workstatus">Working Status</th>
-                        <th class="col-doctype">Document Type</th>
-                        <th class="col-file">File</th>
                         <th class="col-status">Status</th>
                         <th class="col-regat">Registered At</th>
                         <th>Action</th>
@@ -421,6 +426,16 @@
                         <td class="col-profcat">{{ $categoryNameMap[$reg->profession] ?? '-' }}</td>
                         <td class="col-state">{{ $stateMap[$reg->state] ?? $reg->state }}</td>
                         <td class="col-city">{{ $cityMap[$reg->city] ?? $reg->city }}</td>
+                        <td class="col-file">
+                            @if($reg->file)
+                                <a class="file-link" href="{{ asset('uploads/' . $reg->file) }}" target="_blank" title="View Document">
+                                    <span style="color:#ef4444;font-size:16px;">&#128196;</span> View
+                                </a>
+                            @else
+                                <span style="color:#ccc;">-</span>
+                            @endif
+                        </td>
+                        <td class="col-doctype">{{ $reg->document_type ?? '-' }}</td>
                         <td class="col-anchal">{{ $anchalMap[$reg->anchal] ?? $reg->anchal }}</td>
                         <td class="col-sadhumargi">{{ $reg->sadhumargi }}</td>
                         <td class="col-hobbies">{{ $reg->hobbies ?? '-' }}</td>
@@ -434,14 +449,6 @@
                         </td>
                         <td class="col-source">{{ $reg->source ?? '-' }}</td>
                         <td class="col-workstatus">{{ $reg->working_status ?? '-' }}</td>
-                        <td class="col-doctype">{{ $reg->document_type ?? '-' }}</td>
-                        <td class="col-file">
-                            @if($reg->file)
-                                <a class="file-link" href="{{ asset('uploads/' . $reg->file) }}" target="_blank">View</a>
-                            @else
-                                -
-                            @endif
-                        </td>
                         <td class="col-status"><span class="status-badge">Approved</span></td>
                         <td class="col-regat">{{ $reg->created_at->format('d-m-Y H:i') }}</td>
                         <td>
@@ -652,20 +659,25 @@
         function openExportModal()  { document.getElementById('exportFieldsModal').classList.add('open'); }
         function closeExportModal() { document.getElementById('exportFieldsModal').classList.remove('open'); }
 
-        function applyColVisibility() {
+        function applyColVisibility(save = true) {
+            var states = {};
             document.querySelectorAll('.col-toggle').forEach(function(cb) {
                 var col = cb.getAttribute('data-col');
                 var visible = cb.checked;
+                states[col] = visible;
                 document.querySelectorAll('.' + col).forEach(function(el) {
                     el.style.display = visible ? '' : 'none';
                 });
                 var row = cb.closest('.modal-row');
                 if (row) { visible ? row.classList.add('is-checked') : row.classList.remove('is-checked'); }
             });
+            if (save) {
+                localStorage.setItem('member_col_visibility', JSON.stringify(states));
+            }
         }
 
         document.querySelectorAll('.col-toggle').forEach(function(cb) {
-            cb.addEventListener('change', applyColVisibility);
+            cb.addEventListener('change', function() { applyColVisibility(true); });
         });
 
         document.querySelectorAll('[name="export_fields[]"]').forEach(function(cb) {
@@ -675,8 +687,22 @@
             });
         });
 
-        // Apply initial state on load
-        applyColVisibility();
+        // Load saved state
+        (function() {
+            var saved = localStorage.getItem('member_col_visibility');
+            if (saved) {
+                try {
+                    var states = JSON.parse(saved);
+                    document.querySelectorAll('.col-toggle').forEach(function(cb) {
+                        var col = cb.getAttribute('data-col');
+                        if (states.hasOwnProperty(col)) {
+                            cb.checked = states[col];
+                        }
+                    });
+                } catch(e) {}
+            }
+            applyColVisibility(false);
+        })();
 
         // Prevent export_fields[] from polluting filter-only URLs
         document.querySelector('button.btn-filter-apply[type="submit"]:not([name])').addEventListener('click', function() {
