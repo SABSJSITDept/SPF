@@ -4,14 +4,28 @@
     <meta charset="UTF-8">
     <title>Members Export</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; margin: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-        th, td { border: 1px solid #ccc; padding: 5px 7px; text-align: left; vertical-align: top; }
-        th { background-color: #1a237e; color: #fff; font-weight: bold; font-size: 10px; }
+        @page { size: A4 landscape; margin: 8px 10px; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 8px; margin: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; table-layout: fixed; }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 2px 3px;
+            text-align: left;
+            vertical-align: top;
+            font-size: 8px;
+            line-height: 1.2;
+            overflow-wrap: anywhere;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+        th { background-color: #1a237e; color: #fff; font-weight: bold; }
+        .col-index { width: 18px; text-align: center; }
+        table.compact th, table.compact td { font-size: 7px; padding: 1.5px 2px; }
+        table.ultra-compact th, table.ultra-compact td { font-size: 6px; padding: 1px 1.5px; }
         tr:nth-child(even) td { background-color: #f5f5f5; }
-        h2 { text-align: center; margin-bottom: 4px; font-size: 16px; color: #1a237e; }
-        .subtitle { text-align: center; font-size: 11px; color: #555; margin-bottom: 12px; }
-        .footer { margin-top: 24px; border-top: 1px solid #ccc; padding-top: 8px; text-align: center; font-size: 9px; color: #888; font-style: italic; }
+        h2 { text-align: center; margin: 0 0 2px 0; font-size: 12px; color: #1a237e; }
+        .subtitle { text-align: center; font-size: 8px; color: #555; margin-bottom: 4px; }
+        .footer { margin-top: 10px; border-top: 1px solid #ccc; padding-top: 5px; text-align: center; font-size: 7px; color: #888; font-style: italic; }
     </style>
 </head>
 <body>
@@ -26,6 +40,8 @@
         $hasLocation = count(array_intersect($fields, ['state','city','anchal'])) > 0;
         $pdfFields   = array_values(array_diff($fields, ['state','city','anchal']));
         if ($hasLocation) $pdfFields[] = 'location';
+        $totalPdfCols = count($pdfFields) + 1; // +1 for serial no.
+        $tableClass = $totalPdfCols >= 14 ? 'ultra-compact' : ($totalPdfCols >= 11 ? 'compact' : '');
 
         $headings = [
             'mid'            => 'MID',
@@ -46,10 +62,10 @@
         ];
     @endphp
 
-    <table>
+    <table class="{{ $tableClass }}">
         <thead>
             <tr>
-                <th>#</th>
+                <th class="col-index">#</th>
                 @foreach($pdfFields as $col)
                     <th>{{ $headings[$col] ?? $col }}</th>
                 @endforeach
@@ -58,7 +74,7 @@
         <tbody>
             @foreach($members as $i => $reg)
             <tr>
-                <td>{{ $i + 1 }}</td>
+                <td class="col-index">{{ $i + 1 }}</td>
                 @foreach($pdfFields as $col)
                     @if($col === 'mid')         <td>{{ $reg->mid ?? '-' }}</td>
                     @elseif($col === 'full_name')    <td>{{ $reg->full_name }}</td>

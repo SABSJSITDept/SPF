@@ -124,12 +124,40 @@
         document.getElementById('global-spinner-overlay').style.display = 'none';
     }
 
+    let downloadSpinnerTimer = null;
+    function scheduleDownloadSpinnerHide() {
+        if (downloadSpinnerTimer) {
+            clearTimeout(downloadSpinnerTimer);
+        }
+        // For file downloads, browser usually stays on same page.
+        // Auto-hide prevents spinner from getting stuck.
+        downloadSpinnerTimer = setTimeout(() => {
+            hideSpinner();
+            downloadSpinnerTimer = null;
+        }, 8000);
+    }
+
     // Attach spinner to all synchronous form submissions automatically
     document.addEventListener('submit', function(e) {
         // Only show spinner if form isn't handled by JS `preventDefault`
         if (!e.defaultPrevented) {
             showSpinner();
+
+            const submitter = e.submitter;
+            const isExportDownload =
+                submitter &&
+                submitter.name === 'export' &&
+                (submitter.value === 'excel' || submitter.value === 'pdf');
+
+            if (isExportDownload) {
+                scheduleDownloadSpinnerHide();
+            }
         }
+    });
+
+    // In many browsers focus returns after download prompt; ensure spinner clears.
+    window.addEventListener('focus', function() {
+        hideSpinner();
     });
 
     // Custom confirm wrapper around sweet alert to replace window.confirm

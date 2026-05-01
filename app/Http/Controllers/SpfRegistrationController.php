@@ -10,9 +10,85 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\Pool;
 
 class SpfRegistrationController extends Controller
 {
+    private function syncMembershipStatus(?string $mid, string $status): void
+    {
+        if (empty($mid)) {
+            return;
+        }
+
+        $action = $status === 'approved' ? 'accept' : 'reject';
+
+        try {
+            Http::connectTimeout(3)
+                ->timeout(8)
+                ->retry(1, 200)
+                ->post('https://mrm.sadhumargi.org/api/member/update-membership-spf', [
+                    'member_id' => $mid,
+                    'action' => $action,
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('SPF membership sync failed', [
+                'mid' => $mid,
+                'status' => $status,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function syncMembershipStatusesBulk(array $mids, string $status): void
+    {
+        $uniqueMids = collect($mids)
+            ->filter(fn ($mid) => !empty($mid))
+            ->map(fn ($mid) => (string) $mid)
+            ->unique()
+            ->values();
+
+        if ($uniqueMids->isEmpty()) {
+            return;
+        }
+
+        $action = $status === 'approved' ? 'accept' : 'reject';
+
+        // Keep chunk size controlled so each pool remains stable under load.
+        foreach ($uniqueMids->chunk(25) as $midChunk) {
+            try {
+                $responses = Http::pool(function (Pool $pool) use ($midChunk, $action) {
+                    foreach ($midChunk as $mid) {
+                        $pool->as($mid)
+                            ->connectTimeout(2)
+                            ->timeout(5)
+                            ->retry(0, 0)
+                            ->post('https://mrm.sadhumargi.org/api/member/update-membership-spf', [
+                                'member_id' => $mid,
+                                'action' => $action,
+                            ]);
+                    }
+                });
+
+                foreach ($responses as $mid => $response) {
+                    if (!$response->successful()) {
+                        Log::warning('SPF membership bulk sync non-success response', [
+                            'mid' => $mid,
+                            'status' => $status,
+                            'http_status' => $response->status(),
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('SPF membership bulk sync batch failed', [
+                    'status' => $status,
+                    'batch_count' => $midChunk->count(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
 
     public function dashboard()
     {
@@ -383,21 +459,7 @@ class SpfRegistrationController extends Controller
 
         $registration->update(['status' => $request->status]);
 
-        // Make API call after status update
-        if ($registration->mid) {
-            $action = $request->status === 'approved' ? 'accept' : 'reject';
-            $apiData = [
-                'member_id' => $registration->mid,
-                'action' => $action
-            ];
-
-            // Call external API
-            try {
-                Http::post('https://mrm.sadhumargi.org/api/member/update-membership-spf', $apiData);
-            } catch (\Exception $e) {
-                // Log error if needed
-            }
-        }
+        $this->syncMembershipStatus($registration->mid, $request->status);
 
         return back()->with('success', 'Status updated successfully.');
     }
@@ -419,28 +481,17 @@ class SpfRegistrationController extends Controller
             abort(403, 'Only Super Admin can change status.');
         }
         $query = SpfRegistration::whereIn('id', $ids);
-        $registrations = $query->get();
+        $registrations = $query->get(['id', 'mid']);
 
-        foreach ($registrations as $registration) {
-            $registration->update(['status' => $request->status]);
-
-            // Make API call after status update
-            if ($registration->mid) {
-                $action = $request->status === 'approved' ? 'accept' : 'reject';
-                $apiData = [
-                    'member_id' => $registration->mid,
-                    'action' => $action
-                ];
-
-                try {
-                    \Illuminate\Support\Facades\Http::post('https://mrm.sadhumargi.org/api/member/update-membership-spf', $apiData);
-                } catch (\Exception $e) {
-                    // Log error if needed
-                }
-            }
+        if ($registrations->isEmpty()) {
+            return back()->with('error', 'No valid members selected.');
         }
 
-        return back()->with('success', count($registrations) . ' members have been ' . $request->status . '.');
+        SpfRegistration::whereIn('id', $registrations->pluck('id'))->update(['status' => $request->status]);
+
+        $this->syncMembershipStatusesBulk($registrations->pluck('mid')->all(), $request->status);
+
+        return back()->with('success', $registrations->count() . ' members have been ' . $request->status . '.');
     }
 
     public function approveAll(Request $request)
@@ -458,23 +509,9 @@ class SpfRegistrationController extends Controller
             return back()->with('error', 'No pending members found to approve.');
         }
 
-        foreach ($registrations as $registration) {
-            $registration->update(['status' => 'approved']);
+        $query->update(['status' => 'approved']);
 
-            // Make API call after status update
-            if ($registration->mid) {
-                $apiData = [
-                    'member_id' => $registration->mid,
-                    'action' => 'accept'
-                ];
-
-                try {
-                    \Illuminate\Support\Facades\Http::post('https://mrm.sadhumargi.org/api/member/update-membership-spf', $apiData);
-                } catch (\Exception $e) {
-                    // Log error if needed
-                }
-            }
-        }
+        $this->syncMembershipStatusesBulk($registrations->pluck('mid')->all(), 'approved');
 
         return back()->with('success', count($registrations) . ' pending members have been approved in bulk.');
     }
