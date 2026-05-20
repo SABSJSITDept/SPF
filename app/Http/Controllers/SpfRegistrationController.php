@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\Pool;
+use App\Services\SmsService;
 
 class SpfRegistrationController extends Controller
 {
@@ -362,6 +363,10 @@ class SpfRegistrationController extends Controller
             return null;
         }
 
+        // Increase memory limit and execution time to handle large datasets (e.g., 5000+ members)
+        ini_set('memory_limit', '2048M');
+        set_time_limit(600);
+
         $members = $query->get();
 
         $branchMap = [];
@@ -372,15 +377,23 @@ class SpfRegistrationController extends Controller
         $fields = $request->input('export_fields', \App\Exports\MembersExport::ALL_FIELDS);
 
         if ($request->export === 'excel') {
-            return \Maatwebsite\Excel\Facades\Excel::download(
+            $response = \Maatwebsite\Excel\Facades\Excel::download(
                 new \App\Exports\MembersExport($members, $cityMap, $stateMap, $anchalMap, $categoryNameMap, $branchMap, $fields),
                 'members_export.xlsx'
             );
+            if ($request->filled('download_token')) {
+                $response->headers->setCookie(cookie('download_token', $request->download_token, 5, '/', null, false, false));
+            }
+            return $response;
         }
 
         if ($request->export === 'pdf') {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('spf_backend.members.pdf', compact('members', 'cityMap', 'stateMap', 'anchalMap', 'categoryNameMap', 'branchMap', 'fields'))->setPaper('a4', 'landscape');
-            return $pdf->download('members_export.pdf');
+            $response = $pdf->download('members_export.pdf');
+            if ($request->filled('download_token')) {
+                $response->headers->setCookie(cookie('download_token', $request->download_token, 5, '/', null, false, false));
+            }
+            return $response;
         }
 
         return null;
@@ -487,6 +500,15 @@ class SpfRegistrationController extends Controller
 
         $this->syncMembershipStatus($registration->mid, $request->status);
 
+        if ($request->status === 'approved') {
+            try {
+                $smsService = app(SmsService::class);
+                $smsService->sendApprovalSms($registration->mobile);
+            } catch (\Throwable $e) {
+                Log::error('SMS sending failed in single approval', ['error' => $e->getMessage()]);
+            }
+        }
+
         return back()->with('success', 'Status updated successfully.');
     }
 
@@ -515,7 +537,7 @@ class SpfRegistrationController extends Controller
             $query = SpfRegistration::where('status', 'pending');
             $filterRequest = Request::create('', 'GET', $filters);
             $this->applyMemberFilters($query, $filterRequest);
-            $registrations = $query->get(['id', 'mid']);
+            $registrations = $query->get(['id', 'mid', 'mobile']);
         } else {
             $ids = collect(explode(',', (string) $request->ids))
                 ->map(fn ($id) => trim($id))
@@ -528,7 +550,7 @@ class SpfRegistrationController extends Controller
             }
 
             $query = SpfRegistration::whereIn('id', $ids);
-            $registrations = $query->get(['id', 'mid']);
+            $registrations = $query->get(['id', 'mid', 'mobile']);
         }
 
         if ($registrations->isEmpty()) {
@@ -538,6 +560,15 @@ class SpfRegistrationController extends Controller
         SpfRegistration::whereIn('id', $registrations->pluck('id'))->update(['status' => $request->status]);
 
         $this->syncMembershipStatusesBulk($registrations->pluck('mid')->all(), $request->status);
+
+        if ($request->status === 'approved') {
+            try {
+                $smsService = app(SmsService::class);
+                $smsService->sendApprovalSmsBulk($registrations->pluck('mobile')->all());
+            } catch (\Throwable $e) {
+                Log::error('SMS sending failed in bulk approval', ['error' => $e->getMessage()]);
+            }
+        }
 
         return back()->with('success', $registrations->count() . ' members have been ' . $request->status . '.');
     }
@@ -560,6 +591,13 @@ class SpfRegistrationController extends Controller
         $query->update(['status' => 'approved']);
 
         $this->syncMembershipStatusesBulk($registrations->pluck('mid')->all(), 'approved');
+
+        try {
+            $smsService = app(SmsService::class);
+            $smsService->sendApprovalSmsBulk($registrations->pluck('mobile')->all());
+        } catch (\Throwable $e) {
+            Log::error('SMS sending failed in approve all', ['error' => $e->getMessage()]);
+        }
 
         return back()->with('success', count($registrations) . ' pending members have been approved in bulk.');
     }

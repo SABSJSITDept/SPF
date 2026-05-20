@@ -36,9 +36,11 @@
         .modal-close-btn { background:rgba(255,255,255,0.2); border:none; color:#fff; width:26px; height:26px; border-radius:50%; cursor:pointer; font-size:18px; line-height:26px; text-align:center; padding:0; }
         .modal-close-btn:hover { background:rgba(255,255,255,0.4); }
         .modal-grid { padding:12px; display:grid; grid-template-columns:1fr 1fr; gap:3px; }
-        .modal-row { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-radius:7px; font-size:13px; cursor:pointer; color:#333; transition:background .12s; user-select:none; }
+        .modal-row { display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-radius:7px; font-size:13px; cursor:grab; color:#333; transition:background .12s; user-select:none; }
         .modal-row:hover { background:#f0f4ff; }
         .modal-row.is-checked { background:#e8eaf6; color:#1a237e; font-weight:600; }
+        .modal-row:active { cursor:grabbing; }
+        .modal-row.dragging { opacity:0.4; background:#e8eaf6; border:1px dashed #3949ab; }
         .modal-row input[type=checkbox] { width:15px; height:15px; accent-color:#1a237e; cursor:pointer; flex-shrink:0; }
         /* Pagination */
         .pagination-wrap { display:flex; justify-content:center; align-items:center; padding:14px 0; gap:4px; }
@@ -265,11 +267,17 @@
                                 <span class="modal-title">&#9881; Select Fields to Export</span>
                                 <button type="button" class="modal-close-btn" onclick="closeExportModal()">&times;</button>
                             </div>
-                            <div class="modal-grid">
+                            <div style="padding:10px 14px 4px;font-size:11.5px;color:#555;font-weight:600;display:flex;align-items:center;gap:6px;background:#f5f5f5;border-bottom:1px solid #eee;">
+                                <span style="font-size:14px;color:#3949ab;">↕</span> Drag and drop rows to reorder columns in export!
+                            </div>
+                            <div class="modal-grid" id="exportFieldsGrid">
                                 @php $efIdx = 1; @endphp
                                 @foreach(['mid'=>'MID','full_name'=>'Full Name','father_name'=>'Father Name','mobile'=>'Mobile','email'=>'Email','gender'=>'Gender','age'=>'Age','dob'=>'DOB','profession'=>'Profession','prof_category'=>'Prof. Category','state'=>'State','city'=>'City','anchal'=>'Anchal','local_sangh'=>'Local Sangh','sadhumargi'=>'Sadhumargi','working_status'=>'Working Status','referral'=>'Referral'] as $fval => $flabel)
-                                <label class="modal-row is-checked" id="ef-{{ $fval }}">
-                                    <span>{{ $efIdx++ }}: {{ $flabel }}</span>
+                                <label class="modal-row is-checked" id="ef-{{ $fval }}" draggable="true">
+                                    <span style="display:flex;align-items:center;gap:6px;">
+                                        <span class="drag-handle" style="color:#9e9e9e;cursor:grab;font-weight:bold;font-size:14px;padding-right:2px;user-select:none;">&#9776;</span>
+                                        <span class="field-label-text"><span class="field-idx">{{ $efIdx++ }}</span>: {{ $flabel }}</span>
+                                    </span>
                                     <input type="checkbox" name="export_fields[]" value="{{ $fval }}" checked>
                                 </label>
                                 @endforeach
@@ -377,8 +385,6 @@
                         <th class="col-id">ID</th>
                         <th class="col-mid">MID</th>
                         <th class="col-fullname">Full Name</th>
-                        <th class="col-file">File</th>
-                        <th class="col-doctype">Document Type</th>
                         <th class="col-fathername">Father Name</th>
                         <th class="col-dob">DOB</th>
                         <th class="col-age">Age</th>
@@ -410,16 +416,6 @@
                         <td class="col-id">{{ $reg->id }}</td>
                         <td class="col-mid">{{ $reg->mid ?? '-' }}</td>
                         <td class="col-fullname">{{ $reg->full_name }}</td>
-                        <td class="col-file">
-                            @if($reg->file)
-                                <a class="file-link" href="{{ asset('uploads/' . $reg->file) }}" target="_blank" title="View Document">
-                                    <span style="color:#ef4444;font-size:16px;">&#128196;</span> View
-                                </a>
-                            @else
-                                <span style="color:#ccc;">-</span>
-                            @endif
-                        </td>
-                        <td class="col-doctype">{{ $reg->document_type ?? '-' }}</td>
                         <td class="col-fathername">{{ $reg->father_name }}</td>
                         <td class="col-dob">{{ $reg->dob ? \Carbon\Carbon::parse($reg->dob)->format('d-m-Y') : '-' }}</td>
                         <td class="col-age">{{ $reg->age }}</td>
@@ -714,6 +710,46 @@
         document.querySelector('button.btn-filter-apply[type="submit"]:not([name])').addEventListener('click', function() {
             document.querySelectorAll('[name="export_fields[]"]').forEach(function(el) { el.disabled = true; });
         });
+
+        // Drag and Drop Column Reordering inside Export Fields Modal
+        (function() {
+            const grid = document.getElementById('exportFieldsGrid');
+            if (!grid) return;
+            
+            grid.addEventListener('dragstart', function(e) {
+                const row = e.target.closest('.modal-row');
+                if (row) {
+                    row.classList.add('dragging');
+                }
+            });
+            
+            grid.addEventListener('dragend', function(e) {
+                const row = e.target.closest('.modal-row');
+                if (row) {
+                    row.classList.remove('dragging');
+                    // Re-number index sequence
+                    let index = 1;
+                    grid.querySelectorAll('.modal-row').forEach(function(r) {
+                        const idxSpan = r.querySelector('.field-idx');
+                        if (idxSpan) {
+                            idxSpan.textContent = index++;
+                        }
+                    });
+                }
+            });
+            
+            grid.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                const draggingRow = grid.querySelector('.dragging');
+                if (!draggingRow) return;
+                const targetRow = e.target.closest('.modal-row');
+                if (targetRow && targetRow !== draggingRow) {
+                    const rect = targetRow.getBoundingClientRect();
+                    const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                    grid.insertBefore(draggingRow, next ? targetRow.nextSibling : targetRow);
+                }
+            });
+        })();
     </script>
 
 @include('includes.backend.footer')

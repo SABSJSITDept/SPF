@@ -31,4 +31,17 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'sms' => [
+        'url' => env('SMS_API_URL', 'http://www.bulksms.saakshisoftware.in/api/mt/SendSMS'),
+        'user' => env('SMS_USER', 'JainSangh'),
+        'password' => env('SMS_PASSWORD', 'Jain@12'),
+        'sender' => env('SMS_SENDER_ID', 'ABSJHO'),
+        'channel' => env('SMS_CHANNEL', 'trans'),
+        'dcs' => env('SMS_DCS', '0'),
+        'flashsms' => env('SMS_FLASHSMS', '0'),
+        'route' => env('SMS_ROUTE', '4'),
+        'peid' => env('SMS_PEID', '1001071123690830532'),
+        'template_id' => env('SMS_TEMPLATE_ID', '1007421822718405594'),
+    ],
+
 ];

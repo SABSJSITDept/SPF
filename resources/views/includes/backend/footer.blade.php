@@ -124,40 +124,47 @@
         document.getElementById('global-spinner-overlay').style.display = 'none';
     }
 
-    let downloadSpinnerTimer = null;
-    function scheduleDownloadSpinnerHide() {
-        if (downloadSpinnerTimer) {
-            clearTimeout(downloadSpinnerTimer);
-        }
-        // For file downloads, browser usually stays on same page.
-        // Auto-hide prevents spinner from getting stuck.
-        downloadSpinnerTimer = setTimeout(() => {
-            hideSpinner();
-            downloadSpinnerTimer = null;
-        }, 8000);
-    }
-
-    // Attach spinner to all synchronous form submissions automatically
+    // Attach spinner and cookie-based download token to exports
     document.addEventListener('submit', function(e) {
-        // Only show spinner if form isn't handled by JS `preventDefault`
-        if (!e.defaultPrevented) {
+        if (e.defaultPrevented) return;
+
+        const form = e.target;
+        const submitter = e.submitter;
+        const isExportDownload =
+            submitter &&
+            submitter.name === 'export' &&
+            (submitter.value === 'excel' || submitter.value === 'pdf');
+
+        if (isExportDownload) {
             showSpinner();
 
-            const submitter = e.submitter;
-            const isExportDownload =
-                submitter &&
-                submitter.name === 'export' &&
-                (submitter.value === 'excel' || submitter.value === 'pdf');
-
-            if (isExportDownload) {
-                scheduleDownloadSpinnerHide();
+            // Create or update download_token hidden input
+            let tokenInput = form.querySelector('input[name="download_token"]');
+            if (!tokenInput) {
+                tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = 'download_token';
+                form.appendChild(tokenInput);
             }
-        }
-    });
+            const token = Date.now().toString();
+            tokenInput.value = token;
 
-    // In many browsers focus returns after download prompt; ensure spinner clears.
-    window.addEventListener('focus', function() {
-        hideSpinner();
+            // Start checking for cookie
+            let checkInterval = setInterval(function() {
+                let cookieMatch = document.cookie.match(new RegExp('(^|;)\\s*download_token\\s*=\\s*([^;]+)'));
+                if (cookieMatch) {
+                    let cookieVal = cookieMatch[2];
+                    if (cookieVal === token) {
+                        clearInterval(checkInterval);
+                        // Delete the cookie
+                        document.cookie = "download_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                        hideSpinner();
+                    }
+                }
+            }, 200);
+        } else {
+            showSpinner();
+        }
     });
 
     // Custom confirm wrapper around sweet alert to replace window.confirm

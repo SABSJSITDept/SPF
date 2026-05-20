@@ -52,9 +52,9 @@ class MembersExport implements FromCollection, WithHeadings, WithMapping
         $this->anchalMap       = $anchalMap;
         $this->categoryNameMap = $categoryNameMap;
         $this->branchMap       = $branchMap;
-        // keep only valid keys, preserve display order
+        // keep only valid keys, preserving user's custom sequence/order
         $this->fields = $fields
-            ? array_values(array_intersect(self::ALL_FIELDS, $fields))
+            ? array_values(array_filter($fields, fn($f) => in_array($f, self::ALL_FIELDS)))
             : self::ALL_FIELDS;
     }
 

@@ -60,9 +60,11 @@
             'referral'       => 'Referral',
             'location'       => 'Location (State / City / Anchal)',
         ];
+        $srNo = 1;
     @endphp
 
-    <table class="{{ $tableClass }}">
+    @foreach($members->chunk(40) as $chunk)
+    <table class="{{ $tableClass }}" style="{{ !$loop->last ? 'page-break-after: always;' : '' }} margin-bottom: 20px;">
         <thead>
             <tr>
                 <th class="col-index">#</th>
@@ -72,9 +74,9 @@
             </tr>
         </thead>
         <tbody>
-            @foreach($members as $i => $reg)
+            @foreach($chunk as $reg)
             <tr>
-                <td class="col-index">{{ $i + 1 }}</td>
+                <td class="col-index">{{ $srNo++ }}</td>
                 @foreach($pdfFields as $col)
                     @if($col === 'mid')         <td>{{ $reg->mid ?? '-' }}</td>
                     @elseif($col === 'full_name')    <td>{{ $reg->full_name }}</td>
@@ -106,6 +108,7 @@
             @endforeach
         </tbody>
     </table>
+    @endforeach
 
     <div class="footer">
         Auto generated from the SPF Portal and does not require any verification.
