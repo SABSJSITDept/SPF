@@ -388,8 +388,124 @@ class SpfRegistrationController extends Controller
         }
 
         if ($request->export === 'pdf') {
-            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('spf_backend.members.pdf', compact('members', 'cityMap', 'stateMap', 'anchalMap', 'categoryNameMap', 'branchMap', 'fields'))->setPaper('a4', 'landscape');
-            $response = $pdf->download('members_export.pdf');
+            ini_set('memory_limit', '2048M');
+            set_time_limit(300);
+
+            // ── Field setup ───────────────────────────────────────────────────
+            $hasLocation = count(array_intersect($fields, ['state','city','anchal'])) > 0;
+            $pdfFields   = array_values(array_diff($fields, ['state','city','anchal']));
+            if ($hasLocation) $pdfFields[] = 'location';
+
+            $headings = [
+                'mid'            => 'MID',
+                'full_name'      => 'Full Name',
+                'father_name'    => 'Father Name',
+                'mobile'         => 'Mobile',
+                'email'          => 'Email',
+                'gender'         => 'Gender',
+                'age'            => 'Age',
+                'dob'            => 'DOB',
+                'profession'     => 'Profession',
+                'prof_category'  => 'Prof. Category',
+                'local_sangh'    => 'Local Sangh',
+                'sadhumargi'     => 'Sadhumargi',
+                'working_status' => 'Working Status',
+                'referral'       => 'Referral',
+                'location'       => 'Location (State / City / Anchal)',
+            ];
+
+            // ── Initialise mPDF ───────────────────────────────────────────────
+            $mpdf = new \Mpdf\Mpdf([
+                'orientation'       => 'L',
+                'format'            => 'A4',
+                'margin_top'        => 8,
+                'margin_bottom'     => 8,
+                'margin_left'       => 10,
+                'margin_right'      => 10,
+                'default_font_size' => 18,
+                'default_font'      => 'dejavusans',
+            ]);
+
+            // ── 1. CSS (once, tiny string) ────────────────────────────────────
+            $mpdf->WriteHTML(
+                'h2{text-align:center;font-size:14pt;color:#1a237e;margin:0 0 4pt;}' .
+                '.sub{text-align:center;font-size:18pt;color:#555;margin:0 0 6pt;}' .
+                'table{width:100%;border-collapse:collapse;}' .
+                'th{background:#1a237e;color:#fff;border:0.5pt solid #555;padding:3pt 4pt;font-size:9pt;word-break:break-word;}' .
+                'td{border:0.5pt solid #ccc;padding:3pt 4pt;font-size:9pt;word-break:break-word;}' .
+                '.footer{text-align:center;font-size:8pt;color:#888;margin-top:8pt;font-style:italic;}',
+                \Mpdf\HTMLParserMode::HEADER_CSS
+            );
+
+            // ── 2. Page header + table start + thead (once) ───────────────────
+            $thead  = '<h2>Sadhumargi Professional Forum</h2>';
+            $thead .= '<div class="sub">Total Records: ' . count($members) . '</div>';
+            $thead .= '<table><thead repeat="1"><tr>';
+            $thead .= '<th style="width:20pt;text-align:center">#</th>';
+            foreach ($pdfFields as $col) {
+                $thead .= '<th>' . htmlspecialchars($headings[$col] ?? $col) . '</th>';
+            }
+            $thead .= '</tr></thead><tbody>';
+            $mpdf->WriteHTML($thead, \Mpdf\HTMLParserMode::HTML_BODY);
+
+            // ── 3. Rows in chunks of 50 — each WriteHTML call is small ────────
+            $srNo = 1;
+            foreach ($members->chunk(50) as $chunk) {
+                $rows = '';
+                foreach ($chunk as $reg) {
+                    $bg    = ($srNo % 2 === 0) ? '#eef0ff' : '#ffffff';
+                    $s     = 'background:' . $bg . ';';
+                    $rows .= '<tr style="' . $s . '">';
+                    $rows .= '<td style="text-align:center;' . $s . '">' . $srNo . '</td>';
+
+                    // precompute location
+                    $lp = [];
+                    if ($hasLocation) {
+                        if (in_array('state',  $fields) && !empty($stateMap[$reg->state]))   $lp[] = $stateMap[$reg->state];
+                        if (in_array('city',   $fields) && !empty($cityMap[$reg->city]))     $lp[] = $cityMap[$reg->city];
+                        if (in_array('anchal', $fields) && !empty($anchalMap[$reg->anchal])) $lp[] = $anchalMap[$reg->anchal];
+                    }
+                    $locText = htmlspecialchars(implode(' / ', $lp) ?: '-');
+
+                    foreach ($pdfFields as $col) {
+                        $cell = match ($col) {
+                            'mid'            => htmlspecialchars($reg->mid ?? '-'),
+                            'full_name'      => htmlspecialchars($reg->full_name ?? '-'),
+                            'father_name'    => htmlspecialchars($reg->father_name ?? '-'),
+                            'mobile'         => htmlspecialchars($reg->mobile ?? '-'),
+                            'email'          => htmlspecialchars($reg->email ?? '-'),
+                            'gender'         => htmlspecialchars($reg->gender ?? '-'),
+                            'age'            => htmlspecialchars((string)($reg->age ?? '-')),
+                            'dob'            => htmlspecialchars($reg->dob ?? '-'),
+                            'profession'     => htmlspecialchars($reg->professional_category ?? '-'),
+                            'prof_category'  => htmlspecialchars($categoryNameMap[$reg->profession] ?? '-'),
+                            'local_sangh'    => htmlspecialchars($branchMap[$reg->local_sangh_id] ?? '-'),
+                            'sadhumargi'     => htmlspecialchars($reg->sadhumargi ?? '-'),
+                            'working_status' => htmlspecialchars($reg->working_status ?? '-'),
+                            'referral'       => htmlspecialchars($reg->referral ?? '-'),
+                            'location'       => $locText,
+                            default          => '-',
+                        };
+                        $rows .= '<td style="' . $s . '">' . $cell . '</td>';
+                    }
+                    $rows .= '</tr>';
+                    $srNo++;
+                }
+                $mpdf->WriteHTML($rows, \Mpdf\HTMLParserMode::HTML_BODY);
+            }
+
+            // ── 4. Close table ────────────────────────────────────────────────
+            $mpdf->WriteHTML(
+                '</tbody></table><div class="footer">Auto generated from the SPF Portal and does not require any verification.</div>',
+                \Mpdf\HTMLParserMode::HTML_BODY
+            );
+
+            // ── 5. Return as download ─────────────────────────────────────────
+            $content  = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
+            $response = response($content, 200, [
+                'Content-Type'        => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="members_export.pdf"',
+            ]);
             if ($request->filled('download_token')) {
                 $response->headers->setCookie(cookie('download_token', $request->download_token, 5, '/', null, false, false));
             }
